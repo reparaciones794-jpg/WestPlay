@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isInHost, postToHost } from '../shared/host'
+import { IS_DEMO, isInHost, postToHost } from '../shared/host'
 import { appleMusicPlayer, pauseAppleMusicWithGame } from './apps/music/pauseWithGame'
 import { BRIGHTNESS_STEP, keybinds, stepped } from './apps/keybinds'
 import { oneAtATime } from './apps/oneAtATime'
@@ -12,6 +12,7 @@ import { AppScreen } from './apps/AppScreen'
 import { BootScreen } from './boot/BootScreen'
 import { Dashboard } from './dashboard/Dashboard'
 import { Home } from './home/Home'
+import { followNamy } from './namy/follow'
 import { followTruckersMp } from './maps/truckersmp'
 import { logGuidance } from './maps/guidanceLog'
 import { routeClicksDuringTransitions } from './shell/clickThrough'
@@ -52,6 +53,8 @@ export function CabinApp() {
   useEffect(() => oneAtATime(PLAYERS), [])
   // The player's keybinds pressed in the game: the music's volume, or play/pause (apps/keybinds.ts).
   useEffect(() => followKeybinds(), [])
+  // Namy, the voice copilot (a separate app on this PC): her words on the screen, her music orders (namy/).
+  useEffect(() => (IS_DEMO ? undefined : followNamy(PLAYERS)), [])
   // The clock where the truck is: its country's time zone, as the game's own clock (state/timeZone.ts).
   useEffect(() => followTimeZone(), [])
   // TruckersMP: its other players, read while the game runs under it (the map's dots, a route's traffic).

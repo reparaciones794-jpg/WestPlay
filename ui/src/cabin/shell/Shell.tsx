@@ -15,6 +15,7 @@ import { useCabin, useLive } from '../state/store'
 import { Sidebar } from './Sidebar'
 import { startLiquidGlass } from './liquidGlass'
 import { useSidebarPeek } from './sidebarPeek'
+import { NamyHud } from '../namy/NamyHud'
 import { VolumeHud } from './VolumeHud'
 import './transitions.css'
 import './reduceTransparency.css'
@@ -156,6 +157,7 @@ export function Shell({ children, overlay, entering = false }: ShellProps) {
           <Player />
           <Keyboard />
           <VolumeHud />
+          <NamyHud />
           <div ref={corners} className="screen-corners" aria-hidden />
         </div>
       </div>
