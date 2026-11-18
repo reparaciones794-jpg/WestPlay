@@ -1,0 +1,67 @@
+# Arma el instalador de WestPlay con Namy adentro (Windows). No es la version oficial: es esta copia modificada.
+# Se corre a mano (Actions -> Run workflow) o al subir una etiqueta "namy-v*" (entonces tambien la publica en Releases).
+name: Armar WestPlay con Namy (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["namy-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            ui/package-lock.json
+
+      - name: Rust (estable)
+        shell: pwsh
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Dependencias (npm)
+        shell: pwsh
+        run: npm install
+
+      - name: Tests de la pantalla (si fallan se muestran, pero no frenan el armado)
+        shell: pwsh
+        run: npm test --prefix ui
+        continue-on-error: true
+
+      - name: Plugin del juego y herramientas (Rust)
+        shell: pwsh
+        run: cargo build --release -p westplay-plugin -p westplay-probe -p westplay-maps
+
+      - name: Instalador (Tauri, sin firma de actualizaciones)
+        shell: pwsh
+        run: npx tauri build --config app/tauri.release.conf.json --config app/tauri.namy.conf.json
+
+      - name: Listar lo armado
+        shell: pwsh
+        run: Get-ChildItem target/release/bundle -Recurse -File | Select-Object FullName, Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WestPlay-con-Namy
+          path: target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Publicar en Releases (solo con etiqueta)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/bundle/nsis/*.exe
