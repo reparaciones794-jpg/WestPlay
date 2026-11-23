@@ -44,7 +44,7 @@ export interface Destination {
 const loading = new Map<string, Promise<Destination[] | null>>()
 
 /** The places of a map (its `places` file), each loaded once. */
-function loadPlaces(url: string): Promise<Destination[] | null> {
+export function loadPlaces(url: string): Promise<Destination[] | null> {
   let places = loading.get(url)
   if (!places) {
     places = fetch(url)

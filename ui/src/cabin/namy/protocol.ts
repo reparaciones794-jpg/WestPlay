@@ -4,6 +4,8 @@
  * messages and the music orders she gives, and tells her what the truck, the job and the weather are.
  */
 
+import type { Nearby } from './nearby'
+
 /** Where Namy listens: her default port (Namy's Configuración › Conectar con WestPlay). */
 export const NAMY_URL = 'http://127.0.0.1:27182'
 
@@ -95,6 +97,8 @@ export interface LiveForNamy {
     deliveryTime: number
   } | null
   weather: { now: string; coming: string; changeIn?: number | null; wetness?: number | null } | null
+  /** The nearest fuel station, rest area and service, from the map (nearby.ts); none without the map. */
+  nearby?: Nearby | null
 }
 
 /** The state sent to Namy (`POST /state`). Units as the host's: speed in m/s, fuel in litres, range in km. */
@@ -118,6 +122,7 @@ export function buildState(live: LiveForNamy): Record<string, unknown> {
     truck: live.truck,
     job: live.job,
     weather: live.weather,
+    nearby: live.nearby ?? null,
   }
 }
 

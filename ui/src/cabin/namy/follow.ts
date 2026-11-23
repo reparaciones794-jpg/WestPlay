@@ -4,6 +4,7 @@ import type { MusicPlayer } from '../apps/musicWithGame'
 import { showVolume } from '../shell/volumeShown'
 import { useLive } from '../state/store'
 import { NamyClient } from './client'
+import { createNearbyProvider } from './nearbyProvider'
 import { receiveChat, receiveLink } from './namyStore'
 
 /** A request gives up after this long, ms (Namy is on this PC: she answers at once or not at all). */
@@ -59,11 +60,12 @@ function playByName(query: string): void {
  */
 export function followNamy(players: readonly MusicPlayer[]): () => void {
   const binds = keybinds(players)
+  const nearby = createNearbyProvider()
   const client = new NamyClient({
     request: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(GIVE_UP_MS) }),
     live: () => {
       const { telemetry, truck, job, weather } = useLive.getState()
-      return { telemetry, truck, job, weather }
+      return { telemetry, truck, job, weather, nearby: nearby() }
     },
     storage: storage(),
     makeId,
