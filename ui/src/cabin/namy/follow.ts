@@ -74,6 +74,11 @@ export function followNamy(players: readonly MusicPlayer[]): () => void {
       if (shown) showVolume(shown.volume)
     },
     onPlay: playByName,
+    // Loaded now, not at start: the map's library isn't carried until the player (or Namy) needs it.
+    onMap: (kind) => {
+      const at = nearby()?.[kind]?.at ?? null
+      void import('../maps/liveMap').then((map) => map.pointOutPlace(at))
+    },
     onChat: receiveChat,
     onLink: receiveLink,
   })

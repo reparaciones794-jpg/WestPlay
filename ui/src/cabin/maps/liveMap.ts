@@ -210,6 +210,56 @@ export function followBearing(listener: (bearing: number) => void): () => void {
 
 let live: LiveMap | null = null
 
+/** A place Namy pointed out ("the nearest fuel station"): marked on the map until the truck gets to it, or after
+ * `POINTED_FOR_MS`, or until she points out another. Kept here, not in the map, because the map is made again
+ * when its data changes, and may not exist yet when she points. */
+const POINTED_FOR_MS = 10 * 60 * 1000
+const POINTED_REACHED_M = 150
+let pointed: {
+  at: [number, number]
+  marker: maplibregl.Marker
+  /** The map it was added to (another is made when the data changes). */
+  on: maplibregl.Map | null
+  expire: ReturnType<typeof setTimeout>
+  watch: ReturnType<typeof setInterval>
+} | null = null
+
+function clearPointed() {
+  if (!pointed) return
+  clearTimeout(pointed.expire)
+  clearInterval(pointed.watch)
+  pointed.marker.remove()
+  pointed = null
+}
+
+/** Puts `at` (lng, lat) on the map as the place Namy pointed out; `null` takes it off. */
+export function pointOutPlace(at: [number, number] | null): void {
+  clearPointed()
+  if (!at) return
+  const element = document.createElement('div')
+  element.className = 'map-pointed'
+  element.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" fill="currentColor" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4" fill="#fff"/></svg>'
+  const marker = new maplibregl.Marker({ element, anchor: 'bottom', pitchAlignment: 'viewport', rotationAlignment: 'viewport' })
+  marker.setLngLat(at)
+  pointed = { at, marker, on: null, expire: setTimeout(clearPointed, POINTED_FOR_MS), watch: setInterval(showPointed, 3000) }
+  showPointed()
+}
+
+/** Puts the pointed-out place on the map there is now (another is made when the data changes, and there is none
+ * until Maps first shows it); takes it off once the truck has got to it. */
+function showPointed() {
+  if (!pointed) return
+  const truck = useLive.getState().telemetry
+  if (truck && metresBetween(pointed.at, toLngLat(truck.x, truck.z)) < POINTED_REACHED_M) {
+    clearPointed()
+    return
+  }
+  if (!live || pointed.on === live.map) return
+  pointed.marker.addTo(live.map)
+  pointed.on = live.map
+}
+
 /** The truck's recent positions, kept from the first map onwards so the camera never starts cold. */
 const samples: TruckSample[] = []
 let collecting = false

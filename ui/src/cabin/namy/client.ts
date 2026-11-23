@@ -1,3 +1,4 @@
+import { isNearbyKind, type NearbyKind } from './nearby'
 import {
   buildState,
   type ChatItem,
@@ -29,6 +30,8 @@ export interface ClientDeps {
   onMusic(command: MusicCommand): void
   /** "Play this": search it and play the first result. */
   onPlay(query: string): void
+  /** "Show me this kind of place": mark the nearest on the map (nearby.ts). */
+  onMap(kind: NearbyKind): void
   /** New things Namy said (`initial`: the first sync, the last few already said before). */
   onChat(items: ChatItem[], status: NamyStatus, initial: boolean): void
   onLink(link: Link): void
@@ -162,6 +165,8 @@ export class NamyClient {
       } else if (item.kind === 'action' && item.action === 'music' && item.command === 'play' && !initial) {
         const query = (item.query ?? '').trim().slice(0, MAX_QUERY)
         if (query) this.deps.onPlay(query)
+      } else if (item.kind === 'action' && item.action === 'map' && isNearbyKind(item.command) && !initial) {
+        this.deps.onMap(item.command)
       }
     }
     const said = chat.items.filter((item) => item.kind !== 'action')

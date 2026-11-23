@@ -16,7 +16,7 @@ describe("the places Namy is told of", () => {
       straight,
       19,
     )
-    expect(found.fuel).toEqual({ name: 'Near', km: 57, ahead: false })
+    expect(found.fuel).toMatchObject({ name: 'Near', km: 57, ahead: false, at: [3000, 0] })
     expect(found.parking?.km).toBeCloseTo(19)
     expect(found.service).toBeUndefined()
     expect(Object.keys(found).sort()).toEqual(['fuel', 'parking'])
@@ -31,9 +31,9 @@ describe("the places Namy is told of", () => {
       { place: second, along: 3000, off: 10 },
     ]
     const found = nearestPlaces([near, first, second, place('parking', 'P', 400)], ahead, straight, 1)
-    expect(found.fuel).toEqual({ name: 'First', km: 2, ahead: true })
+    expect(found.fuel).toMatchObject({ name: 'First', km: 2, ahead: true })
     // Nothing ahead of that kind: it falls back to the straight line.
-    expect(found.parking).toEqual({ name: 'P', km: 0.4, ahead: false })
+    expect(found.parking).toMatchObject({ name: 'P', km: 0.4, ahead: false })
   })
 
   it('skips places whose distance is unknown', () => {

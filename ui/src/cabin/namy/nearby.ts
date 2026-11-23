@@ -15,12 +15,14 @@ export interface NearbyPlace {
   km: number
   /** On the route still to drive (else in a straight line). */
   ahead: boolean
+  /** lng, lat: where it is on the map (for marking it; Namy doesn't use it). */
+  at: [number, number]
 }
 
 export type Nearby = Partial<Record<NearbyKind, NearbyPlace>>
 
-function isNearbyKind(kind: string): kind is NearbyKind {
-  return (NEARBY_KINDS as readonly string[]).includes(kind)
+export function isNearbyKind(kind: unknown): kind is NearbyKind {
+  return typeof kind === 'string' && (NEARBY_KINDS as readonly string[]).includes(kind)
 }
 
 /**
@@ -38,7 +40,7 @@ export function nearestPlaces(
   for (const item of ahead ?? []) {
     const kind = item.place.kind
     if (isNearbyKind(kind) && !found[kind]) {
-      found[kind] = { name: item.place.localized ?? item.place.name, km: (item.along * scale) / 1000, ahead: true }
+      found[kind] = { name: item.place.localized ?? item.place.name, km: (item.along * scale) / 1000, ahead: true, at: item.place.at }
     }
   }
   const best: Partial<Record<NearbyKind, { place: Destination; metres: number }>> = {}
@@ -52,7 +54,7 @@ export function nearestPlaces(
   }
   for (const kind of NEARBY_KINDS) {
     const at = best[kind]
-    if (at) found[kind] = { name: at.place.localized ?? at.place.name, km: (at.metres * scale) / 1000, ahead: false }
+    if (at) found[kind] = { name: at.place.localized ?? at.place.name, km: (at.metres * scale) / 1000, ahead: false, at: at.place.at }
   }
   return found
 }

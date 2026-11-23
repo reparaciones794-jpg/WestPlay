@@ -10,6 +10,7 @@ function setup(replies: Record<string, Reply[] | Reply>) {
   const store = new Map<string, string>()
   const music: MusicCommand[] = []
   const plays: string[] = []
+  const maps: string[] = []
   const chats: { items: ChatItem[]; initial: boolean }[] = []
   const links: Link[] = []
   const deps: ClientDeps = {
@@ -31,11 +32,12 @@ function setup(replies: Record<string, Reply[] | Reply>) {
     makeId: () => 'abcdef0123456789',
     onMusic: (c) => music.push(c),
     onPlay: (q) => plays.push(q),
+    onMap: (k) => maps.push(k),
     onChat: (items, _status, initial) => chats.push({ items, initial }),
     onLink: (l) => links.push(l),
     baseUrl: 'http://namy.test',
   }
-  return { deps, calls, store, music, plays, chats, links }
+  return { deps, calls, store, music, plays, maps, chats, links }
 }
 
 const ok = (body: unknown) => ({ status: 200, body })
@@ -108,6 +110,16 @@ describe('the cab following Namy', () => {
     await client.step()
     expect(t.plays).toEqual(['soda stereo'])
     expect(t.music).toEqual([])
+  })
+
+  it('marks the nearest place of a kind once, never on the first sync and never a kind it does not know', async () => {
+    const map = (id: number, command: string) => ({ id, kind: 'action', action: 'map', command })
+    const t = paired({ '/chat': [chat(5, [map(5, 'fuel')]), chat(8, [map(6, 'parking'), map(7, 'hotel'), map(8, 'service')]), chat(8)] })
+    const client = new NamyClient(t.deps)
+    await client.step()
+    await client.step()
+    await client.step()
+    expect(t.maps).toEqual(['parking', 'service'])
   })
 
   it('plays each new music order once, and only the valid ones', async () => {
