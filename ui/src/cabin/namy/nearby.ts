@@ -6,7 +6,7 @@ import type { Destination } from '../maps/places'
  * fuel station, rest area and service, from the map the Maps app draws (maps/places.ts). Namy has no map of her own.
  */
 
-export const NEARBY_KINDS = ['fuel', 'parking', 'service'] as const
+export const NEARBY_KINDS = ['fuel', 'parking', 'service', 'hotel', 'weigh', 'dealer', 'garage'] as const
 export type NearbyKind = (typeof NEARBY_KINDS)[number]
 
 export interface NearbyPlace {
@@ -17,6 +17,8 @@ export interface NearbyPlace {
   ahead: boolean
   /** lng, lat: where it is on the map (for marking it; Namy doesn't use it). */
   at: [number, number]
+  /** The map node the game routes to (its uid, hex), for taking the player there (Namy doesn't use it). */
+  node: string
 }
 
 export type Nearby = Partial<Record<NearbyKind, NearbyPlace>>
@@ -40,7 +42,7 @@ export function nearestPlaces(
   for (const item of ahead ?? []) {
     const kind = item.place.kind
     if (isNearbyKind(kind) && !found[kind]) {
-      found[kind] = { name: item.place.localized ?? item.place.name, km: (item.along * scale) / 1000, ahead: true, at: item.place.at }
+      found[kind] = { name: item.place.localized ?? item.place.name, km: (item.along * scale) / 1000, ahead: true, at: item.place.at, node: item.place.node }
     }
   }
   const best: Partial<Record<NearbyKind, { place: Destination; metres: number }>> = {}
@@ -54,7 +56,7 @@ export function nearestPlaces(
   }
   for (const kind of NEARBY_KINDS) {
     const at = best[kind]
-    if (at) found[kind] = { name: at.place.localized ?? at.place.name, km: (at.metres * scale) / 1000, ahead: false, at: at.place.at }
+    if (at) found[kind] = { name: at.place.localized ?? at.place.name, km: (at.metres * scale) / 1000, ahead: false, at: at.place.at, node: at.place.node }
   }
   return found
 }

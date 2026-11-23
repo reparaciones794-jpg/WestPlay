@@ -3,8 +3,10 @@ import { ask, play } from '../apps/youtube/youtube'
 import type { MusicPlayer } from '../apps/musicWithGame'
 import { showVolume } from '../shell/volumeShown'
 import { useLive } from '../state/store'
-import { NamyClient } from './client'
-import { createNearbyProvider } from './nearbyProvider'
+import { changeRoute } from '../maps/routeChange'
+import { NamyClient, type NavigateCommand } from './client'
+import { isNearbyKind } from './nearby'
+import { createNearbyProvider, type NearbyProvider } from './nearbyProvider'
 import { receiveChat, receiveLink } from './namyStore'
 
 /** A request gives up after this long, ms (Namy is on this PC: she answers at once or not at all). */
@@ -53,6 +55,33 @@ function playByName(query: string): void {
   })
 }
 
+/** Takes the player where Namy was asked to ("take me to the nearest fuel station", "add Hamburg as a stop"), cancels the
+ * route, or marks a place, with the game's own GPS as the Maps app's buttons do; then tells her how it went. */
+async function navigate(
+  command: NavigateCommand,
+  query: string,
+  nearby: NearbyProvider,
+  report: (answer: string, name?: string, km?: number) => void,
+): Promise<void> {
+  if (command === 'end') {
+    report(await changeRoute('end'))
+    return
+  }
+  const found = nearby.find(query)
+  if (found === 'noMap') return report('noMap')
+  if (!found) return report('notFound', isNearbyKind(query) ? '' : query)
+  const name = found.name
+  const km = Math.round(found.km * 10) / 10
+  const mark = () => void import('../maps/liveMap').then((map) => map.pointOutPlace(found.place.at))
+  if (command === 'find') {
+    mark()
+    return report('done', name, km)
+  }
+  const answer = await changeRoute(command, found.place.node)
+  if (answer === 'done') mark()
+  report(answer, name, km)
+}
+
 /**
  * Connects the cab with Namy, the voice copilot (namy/protocol.ts): the game's state goes to her, her words show
  * on the screen (NamyHud.tsx), and her music orders act on the cab's players as the keybinds do. Returns the
@@ -61,11 +90,11 @@ function playByName(query: string): void {
 export function followNamy(players: readonly MusicPlayer[]): () => void {
   const binds = keybinds(players)
   const nearby = createNearbyProvider()
-  const client = new NamyClient({
+  const client: NamyClient = new NamyClient({
     request: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(GIVE_UP_MS) }),
     live: () => {
       const { telemetry, truck, job, weather } = useLive.getState()
-      return { telemetry, truck, job, weather, nearby: nearby() }
+      return { telemetry, truck, job, weather, nearby: nearby.current() }
     },
     storage: storage(),
     makeId,
@@ -76,8 +105,13 @@ export function followNamy(players: readonly MusicPlayer[]): () => void {
     onPlay: playByName,
     // Loaded now, not at start: the map's library isn't carried until the player (or Namy) needs it.
     onMap: (kind) => {
-      const at = nearby()?.[kind]?.at ?? null
+      const at = nearby.current()?.[kind]?.at ?? null
       void import('../maps/liveMap').then((map) => map.pointOutPlace(at))
+    },
+    onNavigate: (command, query) => {
+      void navigate(command, query, nearby, (answer, name, km) =>
+        client.report({ event: 'route', action: command, answer, name, km }),
+      ).catch(() => client.report({ event: 'route', action: command, answer: 'unexpected' }))
     },
     onChat: receiveChat,
     onLink: receiveLink,

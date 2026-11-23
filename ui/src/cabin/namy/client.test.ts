@@ -11,6 +11,7 @@ function setup(replies: Record<string, Reply[] | Reply>) {
   const music: MusicCommand[] = []
   const plays: string[] = []
   const maps: string[] = []
+  const navs: [string, string][] = []
   const chats: { items: ChatItem[]; initial: boolean }[] = []
   const links: Link[] = []
   const deps: ClientDeps = {
@@ -33,11 +34,12 @@ function setup(replies: Record<string, Reply[] | Reply>) {
     onMusic: (c) => music.push(c),
     onPlay: (q) => plays.push(q),
     onMap: (k) => maps.push(k),
+    onNavigate: (command, query) => navs.push([command, query]),
     onChat: (items, _status, initial) => chats.push({ items, initial }),
     onLink: (l) => links.push(l),
     baseUrl: 'http://namy.test',
   }
-  return { deps, calls, store, music, plays, maps, chats, links }
+  return { deps, calls, store, music, plays, maps, navs, chats, links }
 }
 
 const ok = (body: unknown) => ({ status: 200, body })
@@ -120,6 +122,30 @@ describe('the cab following Namy', () => {
     await client.step()
     await client.step()
     expect(t.maps).toEqual(['parking', 'service'])
+  })
+
+  it('hands on route orders once, only valid ones, an end order needing no place', async () => {
+    const nav = (id: number, command: string, query?: string) => ({ id, kind: 'action', action: 'navigate', command, query })
+    const t = paired({
+      '/chat': [chat(5, [nav(5, 'go', 'fuel')]), chat(10, [nav(6, 'go', ' Hamburg '), nav(7, 'addStop', ''), nav(8, 'end'), nav(9, 'fly', 'x'), nav(10, 'find', 'Berlin')]), chat(10)],
+    })
+    const client = new NamyClient(t.deps)
+    await client.step()
+    await client.step()
+    await client.step()
+    expect(t.navs).toEqual([['go', 'Hamburg'], ['end', ''], ['find', 'Berlin']])
+  })
+
+  it('tells Namy how a route turned out, with her token, and nothing without it', async () => {
+    const event = { event: 'route', action: 'go', answer: 'done', name: 'Shell', km: 12 } as const
+    const t = paired({ '/chat': chat(0) })
+    new NamyClient(t.deps).report(event)
+    const sent = t.calls.find((c) => c.path === '/event')
+    expect(sent?.auth).toBe('Bearer tok')
+    expect(JSON.parse(sent!.body!)).toEqual(event)
+    const unpaired = setup({})
+    new NamyClient(unpaired.deps).report(event)
+    expect(unpaired.calls).toEqual([])
   })
 
   it('plays each new music order once, and only the valid ones', async () => {

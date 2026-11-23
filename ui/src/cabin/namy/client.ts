@@ -12,7 +12,23 @@ import {
 
 /** Where the cab stands with Namy: not looked for yet / not answering / waiting for the player to allow it /
  * refused / connected. */
+export const NAVIGATE_COMMANDS = ['go', 'addStop', 'end', 'find'] as const
+export type NavigateCommand = (typeof NAVIGATE_COMMANDS)[number]
+
+/** What the cab tells Namy of a route she asked for (she says it; the cab has no words of its own). */
+export interface RouteEvent {
+  event: 'route'
+  action: NavigateCommand
+  answer: string
+  name?: string
+  km?: number
+}
+
 export type Link = 'off' | 'offline' | 'pairing' | 'denied' | 'connected'
+
+function isNavigateCommand(value: unknown): value is NavigateCommand {
+  return typeof value === 'string' && (NAVIGATE_COMMANDS as readonly string[]).includes(value)
+}
 
 /** What the client needs from outside, so it can be tested without a browser. */
 const MAX_QUERY = 100
@@ -32,6 +48,8 @@ export interface ClientDeps {
   onPlay(query: string): void
   /** "Show me this kind of place": mark the nearest on the map (nearby.ts). */
   onMap(kind: NearbyKind): void
+  /** "Take me there" / "add it as a stop" / "cancel the route" / "where is…": `query` is a kind of place or a name. */
+  onNavigate(command: NavigateCommand, query: string): void
   /** New things Namy said (`initial`: the first sync, the last few already said before). */
   onChat(items: ChatItem[], status: NamyStatus, initial: boolean): void
   onLink(link: Link): void
@@ -167,11 +185,27 @@ export class NamyClient {
         if (query) this.deps.onPlay(query)
       } else if (item.kind === 'action' && item.action === 'map' && isNearbyKind(item.command) && !initial) {
         this.deps.onMap(item.command)
+      } else if (item.kind === 'action' && item.action === 'navigate' && isNavigateCommand(item.command) && !initial) {
+        const query = (item.query ?? '').trim().slice(0, MAX_QUERY)
+        if (query || item.command === 'end') this.deps.onNavigate(item.command, query)
       }
     }
     const said = chat.items.filter((item) => item.kind !== 'action')
     this.deps.onChat(said, chat.status, initial)
     return SYNC_EVERY
+  }
+
+  /** Tells Namy how a route she asked for turned out. Fire and forget: if she doesn't hear, she says so herself. */
+  report(event: RouteEvent): void {
+    const token = this.token
+    if (!token) return
+    void this.deps
+      .request(this.url('/event'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      })
+      .catch(() => {})
   }
 
   /** Starts the rounds. */
